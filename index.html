@@ -561,12 +561,20 @@ function loop(t){requestAnimationFrame(loop);if(t-last<50)return;last=t;
  Here the host's camera view (or projector screen) is streamed to everyone who opens the link, peer to peer (PeerJS). */
 (function(){
  const b=$('#bLive'),nEl=$('#liveN'),AL='abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789',MAXV=8,BASE='https://easylandx.github.io/super8/';
- const loadPeer=()=>window.Peer?Promise.resolve():new Promise((res,rej)=>{const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js';s.onload=res;s.onerror=()=>rej(new Error('peerjs'));document.head.appendChild(s)});
+ const loadPeer=()=>Promise.all([loadLib(),loadIce()]);
+ const loadLib=()=>window.Peer?Promise.resolve():new Promise((res,rej)=>{const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js';s.onload=res;s.onerror=()=>rej(new Error('peerjs'));document.head.appendChild(s)});
  const rnd=()=>{let c='';const a=new Uint32Array(8);crypto.getRandomValues(a);for(const v of a)c+=AL[v%AL.length];return c};
  const url=c=>BASE+'?live='+c;
  /* STUN + a TURN relay: without a relay, phones on mobile data / different Wi-Fi often cannot reach each other and the viewer sees nothing */
- const ICE={iceServers:[{urls:'stun:stun.l.google.com:19302'},{urls:'stun:global.stun.twilio.com:3478'},
-  {urls:['turn:openrelay.metered.ca:80','turn:openrelay.metered.ca:443','turn:openrelay.metered.ca:443?transport=tcp','turns:openrelay.metered.ca:443?transport=tcp'],username:'openrelayproject',credential:'openrelayproject'}],iceCandidatePoolSize:4};
+ const ICE={iceServers:[{urls:'stun:stun.l.google.com:19302'},{urls:'stun:stun.cloudflare.com:3478'},{urls:'stun:global.stun.twilio.com:3478'},
+  {urls:['turn:openrelay.metered.ca:80','turn:openrelay.metered.ca:443','turn:openrelay.metered.ca:443?transport=tcp','turns:openrelay.metered.ca:443?transport=tcp'],username:'openrelayproject',credential:'openrelayproject'},
+  {urls:['turn:freestun.net:3478','turns:freestun.net:5349'],username:'free',credential:'free'}],iceCandidatePoolSize:4};
+ /* Free public relays come and go. For a relay that always works: make a free account at metered.ca, then put your app name and API key here (both empty = public relays only) */
+ const TURN_APP='',TURN_KEY='';let iceP=null;
+ const loadIce=()=>iceP||(iceP=(async()=>{if(!TURN_APP||!TURN_KEY)return;
+  try{const ctl=new AbortController(),tm=setTimeout(()=>ctl.abort(),4000);
+   const r=await fetch('https://'+TURN_APP+'.metered.live/api/v1/turn/credentials?apiKey='+TURN_KEY,{signal:ctl.signal});clearTimeout(tm);
+   const j=await r.json();if(Array.isArray(j)&&j.length)ICE.iceServers=j.concat(ICE.iceServers)}catch(e){}})());
  function copy(t){try{const x=document.createElement('textarea');x.value=t;x.setAttribute('readonly','');x.style.cssText='position:fixed;left:-9999px;top:0;opacity:0';document.body.appendChild(x);x.select();document.execCommand('copy');x.remove()}catch(e){}}
 
  /* ---------- viewer side: ?live=CODE ---------- */
@@ -581,8 +589,10 @@ function loop(t){requestAnimationFrame(loop);if(t-last<50)return;last=t;
    if(Date.now()-t0>LIMIT){end();return}
    try{pr&&pr.destroy()}catch(e){}
    const me=pr=new Peer({config:ICE});
-   me.on('call',call=>{call.answer();call.on('stream',st=>{got=true;t0=Date.now();clearTimeout(rt);vv.srcObject=st;vv.play().catch(()=>{});lm.style.display='none';badge.textContent='LIVE';document.body.classList.remove('liveEnded')})});
-   me.on('error',()=>{if(pr!==me||over||got)return;say('Waiting for the host…');later(2500)});
+   me.on('call',call=>{call.answer();
+    const pc=call.peerConnection;if(pc)pc.addEventListener('iceconnectionstatechange',()=>{if(pr!==me||got||over)return;if(pc.iceConnectionState==='failed'){say('The network blocked the connection, trying again…');later(1500)}});
+    call.on('stream',st=>{got=true;t0=Date.now();clearTimeout(rt);vv.srcObject=st;vv.play().catch(()=>{});lm.style.display='none';badge.textContent='LIVE';document.body.classList.remove('liveEnded')})});
+   me.on('error',()=>{if(pr!==me||over||got)return;say('Waiting for the host… (the host must keep Super 8 open)');later(2500)});
    me.on('open',()=>{
     if(pr!==me)return;
     const d=me.connect('s8L'+LV,{reliable:true});
@@ -590,7 +600,7 @@ function loop(t){requestAnimationFrame(loop);if(t-last<50)return;last=t;
     d.on('data',m=>{if(m&&m.k==='end')end()});
     const lost=()=>{if(pr!==me||over)return;got=false;say('Reconnecting to the live session…');later(2000)};
     d.on('close',lost);d.on('error',()=>{if(!got)lost()});
-    later(12000)})}   // no picture after 12 s: start over
+    later(25000)})}   // no picture after 25 s (relays can be slow): start over
   vv.onclick=()=>vv.play().catch(()=>{});
   document.addEventListener('visibilitychange',()=>{if(!document.hidden&&!got&&!over)later(200)});
   say('Connecting to the live session…');
@@ -618,7 +628,7 @@ function loop(t){requestAnimationFrame(loop);if(t-last<50)return;last=t;
    if(conns.filter(x=>x.open).length>=MAXV){try{c.send({k:'end'})}catch(e){}setTimeout(()=>c.close(),300);return}
    conns.push(c);count();
    try{const call=peer.call(c.peer,fstream);calls.push(call)}catch(e){}});
-  const gone=()=>{conns=conns.filter(x=>x!==c);count()};
+  const gone=()=>{conns=conns.filter(x=>x!==c);calls=calls.filter(k=>{if(k.peer===c.peer){try{k.close()}catch(e){}return false}return true});count()};
   c.on('close',gone);c.on('error',gone)}
  const keepAwake=()=>{try{navigator.wakeLock&&navigator.wakeLock.request('screen').then(x=>{wl=x}).catch(()=>{})}catch(e){}};
  /* coming back from WhatsApp: wake the connection to the live server up again so new viewers can join */
@@ -627,6 +637,10 @@ function loop(t){requestAnimationFrame(loop);if(t-last<50)return;last=t;
   keepAwake();
   if(!peer||peer.destroyed)begin(code);
   else if(peer.disconnected){try{peer.reconnect()}catch(e){begin(code)}}});
+ setInterval(()=>{   // heartbeat: while the page is open, keep the host reachable for people who tap the link later
+  if(!hosting||!code||document.hidden)return;
+  if(!peer||peer.destroyed){begin(code);return}
+  if(peer.disconnected){try{peer.reconnect()}catch(e){}}},4000);
  function begin(id){
   if(!window.Peer)return;
   const pr=new Peer('s8L'+id,{config:ICE});peer=pr;
@@ -649,8 +663,9 @@ function loop(t){requestAnimationFrame(loop);if(t-last<50)return;last=t;
   toast('Live link copied!',2600);
   loadPeer().then(()=>{if(hosting)begin(code)}).catch(()=>stopLive('Couldn’t start live sharing'));
   /* straight into WhatsApp with the invite ready to send */
+  /* never navigate THIS page to a web URL: it would unload Super 8 and end the live session. The link is already copied, so if WhatsApp does not open, just paste it. */
   if(MOB){location.href='whatsapp://send?text='+t;
-   setTimeout(()=>{if(!document.hidden)location.href='https://api.whatsapp.com/send?text='+t},1500)}
+   setTimeout(()=>{if(!document.hidden)toast('Live link copied. Open WhatsApp and paste it, then come back here.',4500)},1800)}
   else window.open('https://web.whatsapp.com/send?text='+t,'_blank')};
 })();
 
