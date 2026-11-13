@@ -391,11 +391,10 @@ pauseIcon();
 const infoL=$('#infoL'),infoR=$('#infoR');
 function setInfo(t,url){infoR.textContent=t;infoR.classList.add('has');if(url){infoL.href=url;infoL.classList.add('has')}else infoL.classList.remove('has')}
 const lampUpdate=()=>document.body.classList.toggle('lamp',playing||lampMan);
-let humOn=true;try{humOn=localStorage.getItem('humOn')!=='0'}catch(e){}
+let humOn=false;   // projector hum starts OFF by default; the button turns it on
 const humFor=()=>{if(!humOn)return()=>{};return src==='archive'?hum(48,18,.02,.03):hum(48,18,.06,.07)};
 function humSync(){[$('#humBtn'),$('#pfHum')].forEach(b=>{b.classList.toggle('off',!humOn);b.setAttribute('aria-pressed',humOn);b.title='Projector background noise: '+(humOn?'on':'off')})}
-function humToggle(){humOn=!humOn;try{localStorage.setItem('humOn',humOn?'1':'0')}catch(e){}
- if(!humOn){stopHum&&stopHum();stopHum=0}
+function humToggle(){humOn=!humOn; if(!humOn){stopHum&&stopHum();stopHum=0}
  else if(playing&&!paused){stopHum&&stopHum();stopHum=humFor()}
  humSync();toast('Projector noise '+(humOn?'on':'off'),1400)}
 $('#humBtn').onclick=humToggle;$('#pfHum').onclick=e=>{e.stopPropagation();humToggle();fsWake()};humSync();
