@@ -580,10 +580,17 @@ function loop(t){requestAnimationFrame(loop);if(t-last<50)return;last=t;
  /* ---------- viewer side: ?live=CODE ---------- */
  if(LV){
   const vv=$('#liveVid'),badge=$('#liveBadge'),lm=$('#liveMsg');
-  let got=false,over=false,pr=null,rt=0,t0=Date.now();const LIMIT=150000;   // keeps trying for 2½ minutes (the host may still be switching back from WhatsApp)
+  let got=false,over=false,pr=null,rt=0,wd=0,t0=Date.now();const LIMIT=150000;   // keeps trying for 2½ minutes (the host may still be switching back from WhatsApp)
   const say=t=>{lm.textContent=t;lm.style.display='block'};
-  const end=()=>{if(over)return;over=true;clearTimeout(rt);try{pr&&pr.destroy()}catch(e){}document.body.classList.add('liveEnded');badge.textContent='ENDED';say('This session has ended')};
+  const end=()=>{if(over)return;over=true;clearTimeout(rt);clearInterval(wd);try{pr&&pr.destroy()}catch(e){}document.body.classList.add('liveEnded');badge.textContent='ENDED';say('This session has ended')};
   const later=ms=>{clearTimeout(rt);rt=setTimeout(connect,ms)};
+  /* a stream can arrive and still be black/frozen: only hide the message once the picture really moves, and start over if it never does */
+  const watch=()=>{clearInterval(wd);let lastT=-1,stale=0;
+   wd=setInterval(()=>{if(over){clearInterval(wd);return}
+    vv.play().catch(()=>{});
+    const ok=vv.videoWidth>0&&vv.currentTime>0&&vv.currentTime!==lastT;lastT=vv.currentTime;
+    if(ok){stale=0;lm.style.display='none';badge.textContent='LIVE'}
+    else{say('Connected, waiting for the host’s picture…');if(++stale>=4){clearInterval(wd);got=false;say('No picture yet, reconnecting…');later(300)}}},2000)};
   function connect(){
    if(over||got)return;
    if(Date.now()-t0>LIMIT){end();return}
@@ -591,7 +598,7 @@ function loop(t){requestAnimationFrame(loop);if(t-last<50)return;last=t;
    const me=pr=new Peer({config:ICE});
    me.on('call',call=>{call.answer();
     const pc=call.peerConnection;if(pc)pc.addEventListener('iceconnectionstatechange',()=>{if(pr!==me||got||over)return;if(pc.iceConnectionState==='failed'){say('The network blocked the connection, trying again…');later(1500)}});
-    call.on('stream',st=>{got=true;t0=Date.now();clearTimeout(rt);vv.srcObject=st;vv.play().catch(()=>{});lm.style.display='none';badge.textContent='LIVE';document.body.classList.remove('liveEnded')})});
+    call.on('stream',st=>{got=true;t0=Date.now();clearTimeout(rt);vv.srcObject=st;vv.play().catch(()=>{});say('Connected, waiting for the host’s picture…');document.body.classList.remove('liveEnded');watch()})});
    me.on('error',()=>{if(pr!==me||over||got)return;say('Waiting for the host… (the host must keep Super 8 open)');later(2500)});
    me.on('open',()=>{
     if(pr!==me)return;
@@ -611,9 +618,20 @@ function loop(t){requestAnimationFrame(loop);if(t-last<50)return;last=t;
  let peer=null,conns=[],calls=[],code=null,hosting=false,ft=0,fstream=null,wl=null,idTry=0;
  const feed=document.createElement('canvas');feed.width=W;feed.height=H;const fx=feed.getContext('2d');
  /* what viewers see = what the host sees: the graded camera picture, or the projector screen */
- function feedOn(){if(fstream)return;fstream=feed.captureStream(20);
-  ft=setInterval(()=>{try{fx.drawImage(mode==='proj'?$('#sc'):live,0,0,W,H)}catch(e){}},50)}
- function feedOff(){clearInterval(ft);ft=0;if(fstream)fstream.getTracks().forEach(t=>t.stop());fstream=null}
+ function feedOn(){if(fstream)return;
+  /* the capture canvas lives in the page (hidden, 2px): detached canvases can give black or frozen video in some browsers */
+  feed.style.cssText='position:fixed;left:0;bottom:0;width:2px;height:2px;opacity:.02;pointer-events:none;z-index:-1';document.body.appendChild(feed);
+  fstream=feed.captureStream(20);let n=0;
+  const note=(a,b)=>{fx.fillStyle='#111';fx.fillRect(0,0,W,H);fx.textAlign='center';fx.fillStyle='#fff';fx.font='bold 22px system-ui,sans-serif';fx.fillText(a,W/2,H/2-8);fx.fillStyle='#bbb';fx.font='15px system-ui,sans-serif';fx.fillText(b,W/2,H/2+20)};
+  ft=setInterval(()=>{try{
+   if(mode==='back'||mode==='front'){
+    if(stream&&vid.readyState>=2&&!document.hidden)fx.drawImage(live,0,0,W,H);
+    else note(document.hidden?'The host stepped away':'Host camera not ready',document.hidden?'Waiting for the host to come back…':'Waiting for the camera…')}
+   else if(document.body.classList.contains('lamp')&&playing)fx.drawImage($('#sc'),0,0,W,H);
+   else note('Projector is off','The host has not started a movie yet');
+   fx.fillStyle='rgba(255,255,255,'+((n++&1)?.02:.03)+')';fx.fillRect(0,0,1,1)   // tiny change every tick so a frame is always sent
+  }catch(e){}},50)}
+ function feedOff(){clearInterval(ft);ft=0;try{feed.remove()}catch(e){}if(fstream)fstream.getTracks().forEach(t=>t.stop());fstream=null}
  const count=()=>{nEl.textContent=conns.filter(c=>c.open).length};
  function stopLive(msg){
   hosting=false;
