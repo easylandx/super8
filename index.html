@@ -564,29 +564,41 @@ function loop(t){requestAnimationFrame(loop);if(t-last<50)return;last=t;
  const loadPeer=()=>window.Peer?Promise.resolve():new Promise((res,rej)=>{const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js';s.onload=res;s.onerror=()=>rej(new Error('peerjs'));document.head.appendChild(s)});
  const rnd=()=>{let c='';const a=new Uint32Array(8);crypto.getRandomValues(a);for(const v of a)c+=AL[v%AL.length];return c};
  const url=c=>BASE+'?live='+c;
+ /* STUN + a TURN relay: without a relay, phones on mobile data / different Wi-Fi often cannot reach each other and the viewer sees nothing */
+ const ICE={iceServers:[{urls:'stun:stun.l.google.com:19302'},{urls:'stun:global.stun.twilio.com:3478'},
+  {urls:['turn:openrelay.metered.ca:80','turn:openrelay.metered.ca:443','turn:openrelay.metered.ca:443?transport=tcp','turns:openrelay.metered.ca:443?transport=tcp'],username:'openrelayproject',credential:'openrelayproject'}],iceCandidatePoolSize:4};
  function copy(t){try{const x=document.createElement('textarea');x.value=t;x.setAttribute('readonly','');x.style.cssText='position:fixed;left:-9999px;top:0;opacity:0';document.body.appendChild(x);x.select();document.execCommand('copy');x.remove()}catch(e){}}
 
  /* ---------- viewer side: ?live=CODE ---------- */
  if(LV){
   const vv=$('#liveVid'),badge=$('#liveBadge'),lm=$('#liveMsg');
-  let got=false,over=false,t0=0;
-  const end=()=>{if(over)return;over=true;clearTimeout(t0);document.body.classList.add('liveEnded');badge.textContent='ENDED';lm.textContent='This session has ended';lm.style.display='block'};
-  lm.textContent='Connecting to the live session…';
+  let got=false,over=false,pr=null,rt=0,t0=Date.now();const LIMIT=150000;   // keeps trying for 2½ minutes (the host may still be switching back from WhatsApp)
+  const say=t=>{lm.textContent=t;lm.style.display='block'};
+  const end=()=>{if(over)return;over=true;clearTimeout(rt);try{pr&&pr.destroy()}catch(e){}document.body.classList.add('liveEnded');badge.textContent='ENDED';say('This session has ended')};
+  const later=ms=>{clearTimeout(rt);rt=setTimeout(connect,ms)};
+  function connect(){
+   if(over||got)return;
+   if(Date.now()-t0>LIMIT){end();return}
+   try{pr&&pr.destroy()}catch(e){}
+   const me=pr=new Peer({config:ICE});
+   me.on('call',call=>{call.answer();call.on('stream',st=>{got=true;t0=Date.now();clearTimeout(rt);vv.srcObject=st;vv.play().catch(()=>{});lm.style.display='none';badge.textContent='LIVE';document.body.classList.remove('liveEnded')})});
+   me.on('error',()=>{if(pr!==me||over||got)return;say('Waiting for the host…');later(2500)});
+   me.on('open',()=>{
+    if(pr!==me)return;
+    const d=me.connect('s8L'+LV,{reliable:true});
+    d.on('open',()=>{if(!got)say('Connected, waiting for the picture…')});
+    d.on('data',m=>{if(m&&m.k==='end')end()});
+    const lost=()=>{if(pr!==me||over)return;got=false;say('Reconnecting to the live session…');later(2000)};
+    d.on('close',lost);d.on('error',()=>{if(!got)lost()});
+    later(12000)})}   // no picture after 12 s: start over
   vv.onclick=()=>vv.play().catch(()=>{});
-  loadPeer().then(()=>{
-   const pr=new Peer();
-   pr.on('call',call=>{call.answer();call.on('stream',st=>{got=true;clearTimeout(t0);vv.srcObject=st;vv.play().catch(()=>{});lm.style.display='none'})});
-   pr.on('error',()=>{if(!got)end()});
-   pr.on('open',()=>{
-    const c=pr.connect('s8L'+LV,{reliable:true});
-    t0=setTimeout(()=>{if(!got)end()},15000);
-    c.on('data',m=>{if(m&&m.k==='end')end()});
-    c.on('close',end);c.on('error',end)})
-  }).catch(end);
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden&&!got&&!over)later(200)});
+  say('Connecting to the live session…');
+  loadPeer().then(connect).catch(()=>say('Couldn’t load the live viewer. Check your connection and reload.'));
   return}
 
  /* ---------- host side ---------- */
- let peer=null,conns=[],calls=[],code=null,hosting=false,ft=0,fstream=null;
+ let peer=null,conns=[],calls=[],code=null,hosting=false,ft=0,fstream=null,wl=null,idTry=0;
  const feed=document.createElement('canvas');feed.width=W;feed.height=H;const fx=feed.getContext('2d');
  /* what viewers see = what the host sees: the graded camera picture, or the projector screen */
  function feedOn(){if(fstream)return;fstream=feed.captureStream(20);
@@ -598,7 +610,7 @@ function loop(t){requestAnimationFrame(loop);if(t-last<50)return;last=t;
   conns.forEach(c=>{try{if(c.open)c.send({k:'end'})}catch(e){}});
   const pr=peer,cs=conns,cl=calls;peer=null;conns=[];calls=[];code=null;
   setTimeout(()=>{cl.forEach(c=>{try{c.close()}catch(e){}});cs.forEach(c=>{try{c.close()}catch(e){}});try{pr&&pr.destroy()}catch(e){}},250);
-  feedOff();b.classList.remove('on');b.setAttribute('aria-pressed','false');nEl.textContent='0';
+  feedOff();try{wl&&wl.release()}catch(e){}wl=null;b.classList.remove('on');b.setAttribute('aria-pressed','false');nEl.textContent='0';
   if(msg)toast(msg,2200)}
  function onConn(c){
   if(!hosting)return;
@@ -608,20 +620,30 @@ function loop(t){requestAnimationFrame(loop);if(t-last<50)return;last=t;
    try{const call=peer.call(c.peer,fstream);calls.push(call)}catch(e){}});
   const gone=()=>{conns=conns.filter(x=>x!==c);count()};
   c.on('close',gone);c.on('error',gone)}
+ const keepAwake=()=>{try{navigator.wakeLock&&navigator.wakeLock.request('screen').then(x=>{wl=x}).catch(()=>{})}catch(e){}};
+ /* coming back from WhatsApp: wake the connection to the live server up again so new viewers can join */
+ document.addEventListener('visibilitychange',()=>{
+  if(document.hidden||!hosting||!code)return;
+  keepAwake();
+  if(!peer||peer.destroyed)begin(code);
+  else if(peer.disconnected){try{peer.reconnect()}catch(e){begin(code)}}});
  function begin(id){
   if(!window.Peer)return;
-  const pr=new Peer('s8L'+id);peer=pr;
+  const pr=new Peer('s8L'+id,{config:ICE});peer=pr;
+  pr.on('open',()=>{idTry=0});
   pr.on('connection',onConn);
   pr.on('disconnected',()=>{try{pr.reconnect()}catch(e){}});
   pr.on('error',e=>{
    if(!hosting||peer!==pr)return;
-   if(e&&e.type==='unavailable-id'){try{pr.destroy()}catch(x){}code=rnd();copy('Watch Live Super8\n'+url(code));begin(code);return}
+   if(e&&e.type==='unavailable-id'){try{pr.destroy()}catch(x){}   // id still held by the server after a drop: retry the SAME link first
+    if(idTry++<5){setTimeout(()=>{if(hosting)begin(id)},2500);return}
+    idTry=0;code=rnd();copy('Watch Live Super8\n'+url(code));begin(code);return}
    if(e&&(e.type==='network'||e.type==='server-error'||e.type==='socket-error'||e.type==='socket-closed'))return;
    stopLive('Couldn’t start live sharing')})}
  b.onclick=()=>{
   if(hosting){stopLive('Live sharing stopped');return}
   /* the link is made and copied right inside the tap, so the browser always allows the clipboard */
-  code=rnd();hosting=true;feedOn();
+  code=rnd();hosting=true;feedOn();keepAwake();
   const msg='Watch Live Super8\n'+url(code),t=encodeURIComponent(msg);
   copy(msg);b.classList.add('on');b.setAttribute('aria-pressed','true');nEl.textContent='0';
   toast('Live link copied!',2600);
