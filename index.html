@@ -135,7 +135,7 @@ body[data-mode=proj] #infoR.has{display:-webkit-box}
 #bLive.on::before{content:"LIVE";position:absolute;left:50%;bottom:-7px;transform:translateX(-50%);background:#fff;color:#c4161c;border:1.5px solid #c4161c;border-radius:8px;padding:0 5px;font:800 8px/12px system-ui,sans-serif;letter-spacing:.08em}
 .ui-hidden #bLive.on{opacity:1;transform:none;pointer-events:auto}
 #liveV{display:none;position:fixed;inset:0;z-index:4;background:var(--kodak);align-items:center;justify-content:center}
-#liveVid{width:min(100vw,calc(100lvh*4/3));aspect-ratio:4/3;background:#000;object-fit:contain;box-shadow:0 0 0 3px #000,0 0 0 5px var(--ye)}
+#liveVid,#liveCv{width:min(100vw,calc(100lvh*4/3));aspect-ratio:4/3;background:#000;object-fit:contain;box-shadow:0 0 0 3px #000,0 0 0 5px var(--ye)}
 #liveBadge{display:none;position:fixed;z-index:6;left:50%;top:calc(env(safe-area-inset-top,0px) + 84px);transform:translateX(-50%);background:#fff;color:#c4161c;border:2px solid #c4161c;border-radius:10px;padding:2px 10px;font:900 12px/16px system-ui,sans-serif;letter-spacing:.1em}
 #liveMsg{position:fixed;z-index:6;left:50%;top:50%;transform:translate(-50%,-50%);max-width:calc(100% - 40px);text-align:center;color:#fff;font:800 16px/1.3 "Avenir Next","Helvetica Neue",Arial,sans-serif;text-shadow:0 1px 6px #000;pointer-events:none}
 body.liveView #liveV,body.liveView #liveBadge{display:flex}
@@ -577,61 +577,64 @@ function loop(t){requestAnimationFrame(loop);if(t-last<50)return;last=t;
    const j=await r.json();if(Array.isArray(j)&&j.length)ICE.iceServers=j.concat(ICE.iceServers)}catch(e){}})());
  function copy(t){try{const x=document.createElement('textarea');x.value=t;x.setAttribute('readonly','');x.style.cssText='position:fixed;left:-9999px;top:0;opacity:0';document.body.appendChild(x);x.select();document.execCommand('copy');x.remove()}catch(e){}}
 
- /* ---------- viewer side: ?live=CODE ---------- */
+ /* ---------- viewer side: ?live=CODE ----------
+    The host sends the picture as JPEG frames over the PeerJS data connection (the same kind of link the Selectric live view uses),
+    instead of a WebRTC video call, which was connecting but delivering black. */
  if(LV){
-  const vv=$('#liveVid'),badge=$('#liveBadge'),lm=$('#liveMsg');
-  let got=false,over=false,pr=null,rt=0,wd=0,t0=Date.now();const LIMIT=150000;   // keeps trying for 2½ minutes (the host may still be switching back from WhatsApp)
+  const vv=$('#liveVid'),badge=$('#liveBadge'),lm=$('#liveMsg'),box=$('#liveV');
+  vv.style.display='none';
+  const cv=document.createElement('canvas');cv.id='liveCv';cv.width=W;cv.height=H;box.appendChild(cv);const cx=cv.getContext('2d');
+  let got=false,over=false,pr=null,rt=0,wd=0,lastF=0,t0=Date.now();const LIMIT=150000;   // keeps trying for 2½ minutes (the host may still be switching back from WhatsApp)
   const say=t=>{lm.textContent=t;lm.style.display='block'};
   const end=()=>{if(over)return;over=true;clearTimeout(rt);clearInterval(wd);try{pr&&pr.destroy()}catch(e){}document.body.classList.add('liveEnded');badge.textContent='ENDED';say('This session has ended')};
   const later=ms=>{clearTimeout(rt);rt=setTimeout(connect,ms)};
-  /* a stream can arrive and still be black/frozen: only hide the message once the picture really moves, and start over if it never does */
-  const watch=()=>{clearInterval(wd);let lastT=-1,stale=0;
-   wd=setInterval(()=>{if(over){clearInterval(wd);return}
-    vv.play().catch(()=>{});
-    const ok=vv.videoWidth>0&&vv.currentTime>0&&vv.currentTime!==lastT;lastT=vv.currentTime;
-    if(ok){stale=0;lm.style.display='none';badge.textContent='LIVE'}
-    else{say('Connected, waiting for the host’s picture…');if(++stale>=4){clearInterval(wd);got=false;say('No picture yet, reconnecting…');later(300)}}},2000)};
+  function paint(m){
+   let bl;try{bl=m instanceof Blob?m:new Blob([m],{type:'image/jpeg'})}catch(e){return}
+   const done=()=>{if(!got){got=true;t0=Date.now();clearTimeout(rt)}lastF=Date.now();lm.style.display='none';badge.textContent='LIVE';document.body.classList.remove('liveEnded')};
+   if(window.createImageBitmap)createImageBitmap(bl).then(bm=>{cx.drawImage(bm,0,0,W,H);try{bm.close()}catch(e){}done()}).catch(()=>{});
+   else{const u=URL.createObjectURL(bl),im=new Image();im.onload=()=>{cx.drawImage(im,0,0,W,H);URL.revokeObjectURL(u);done()};im.src=u}}
+  /* no picture for a few seconds while connected: start over */
+  const watch=()=>{clearInterval(wd);wd=setInterval(()=>{if(over||!got)return;if(Date.now()-lastF>8000){got=false;say('Lost the picture, reconnecting…');later(300)}},2000)};
   function connect(){
    if(over||got)return;
    if(Date.now()-t0>LIMIT){end();return}
    try{pr&&pr.destroy()}catch(e){}
    const me=pr=new Peer({config:ICE});
-   me.on('call',call=>{call.answer();
-    const pc=call.peerConnection;if(pc)pc.addEventListener('iceconnectionstatechange',()=>{if(pr!==me||got||over)return;if(pc.iceConnectionState==='failed'){say('The network blocked the connection, trying again…');later(1500)}});
-    call.on('stream',st=>{got=true;t0=Date.now();clearTimeout(rt);vv.srcObject=st;vv.play().catch(()=>{});say('Connected, waiting for the host’s picture…');document.body.classList.remove('liveEnded');watch()})});
    me.on('error',()=>{if(pr!==me||over||got)return;say('Waiting for the host… (the host must keep Super 8 open)');later(2500)});
    me.on('open',()=>{
     if(pr!==me)return;
     const d=me.connect('s8L'+LV,{reliable:true});
     d.on('open',()=>{if(!got)say('Connected, waiting for the picture…')});
-    d.on('data',m=>{if(m&&m.k==='end')end()});
+    d.on('data',m=>{if(m&&m.k==='end'){end();return}if(m&&m.k)return;paint(m)});
     const lost=()=>{if(pr!==me||over)return;got=false;say('Reconnecting to the live session…');later(2000)};
     d.on('close',lost);d.on('error',()=>{if(!got)lost()});
     later(25000)})}   // no picture after 25 s (relays can be slow): start over
-  vv.onclick=()=>vv.play().catch(()=>{});
+  watch();
   document.addEventListener('visibilitychange',()=>{if(!document.hidden&&!got&&!over)later(200)});
   say('Connecting to the live session…');
   loadPeer().then(connect).catch(()=>say('Couldn’t load the live viewer. Check your connection and reload.'));
   return}
 
  /* ---------- host side ---------- */
- let peer=null,conns=[],calls=[],code=null,hosting=false,ft=0,fstream=null,wl=null,idTry=0;
+ let peer=null,conns=[],calls=[],code=null,hosting=false,ft=0,st=0,fstream=false,wl=null,idTry=0;
  const feed=document.createElement('canvas');feed.width=W;feed.height=H;const fx=feed.getContext('2d');
  /* what viewers see = what the host sees: the graded camera picture, or the projector screen */
- function feedOn(){if(fstream)return;
-  /* the capture canvas lives in the page (hidden, 2px): detached canvases can give black or frozen video in some browsers */
+ function feedOn(){if(fstream)return;fstream=true;
   feed.style.cssText='position:fixed;left:0;bottom:0;width:2px;height:2px;opacity:.02;pointer-events:none;z-index:-1';document.body.appendChild(feed);
-  fstream=feed.captureStream(20);let n=0;
   const note=(a,b)=>{fx.fillStyle='#111';fx.fillRect(0,0,W,H);fx.textAlign='center';fx.fillStyle='#fff';fx.font='bold 22px system-ui,sans-serif';fx.fillText(a,W/2,H/2-8);fx.fillStyle='#bbb';fx.font='15px system-ui,sans-serif';fx.fillText(b,W/2,H/2+20)};
   ft=setInterval(()=>{try{
    if(mode==='back'||mode==='front'){
     if(stream&&vid.readyState>=2&&!document.hidden)fx.drawImage(live,0,0,W,H);
     else note(document.hidden?'The host stepped away':'Host camera not ready',document.hidden?'Waiting for the host to come back…':'Waiting for the camera…')}
    else if(document.body.classList.contains('lamp')&&playing)fx.drawImage($('#sc'),0,0,W,H);
-   else note('Projector is off','The host has not started a movie yet');
-   fx.fillStyle='rgba(255,255,255,'+((n++&1)?.02:.03)+')';fx.fillRect(0,0,1,1)   // tiny change every tick so a frame is always sent
-  }catch(e){}},50)}
- function feedOff(){clearInterval(ft);ft=0;try{feed.remove()}catch(e){}if(fstream)fstream.getTracks().forEach(t=>t.stop());fstream=null}
+   else note('Projector is off','The host has not started a movie yet')
+  }catch(e){}},50);
+  /* ~8 pictures a second, encoded once and sent to every viewer; a viewer whose link is backed up simply skips pictures */
+  let enc=false;
+  st=setInterval(()=>{if(enc||!conns.some(c=>c.open))return;enc=true;
+   feed.toBlob(bl=>{if(!bl){enc=false;return}
+    bl.arrayBuffer().then(buf=>{conns.forEach(c=>{try{if(c.open&&(!c.dataChannel||c.dataChannel.bufferedAmount<300000))c.send(buf)}catch(e){}});enc=false}).catch(()=>{enc=false})},'image/jpeg',.6)},120)}
+ function feedOff(){clearInterval(ft);clearInterval(st);ft=0;st=0;try{feed.remove()}catch(e){}fstream=false}
  const count=()=>{nEl.textContent=conns.filter(c=>c.open).length};
  function stopLive(msg){
   hosting=false;
@@ -645,7 +648,7 @@ function loop(t){requestAnimationFrame(loop);if(t-last<50)return;last=t;
   c.on('open',()=>{
    if(conns.filter(x=>x.open).length>=MAXV){try{c.send({k:'end'})}catch(e){}setTimeout(()=>c.close(),300);return}
    conns.push(c);count();
-   try{const call=peer.call(c.peer,fstream);calls.push(call)}catch(e){}});
+   });
   const gone=()=>{conns=conns.filter(x=>x!==c);calls=calls.filter(k=>{if(k.peer===c.peer){try{k.close()}catch(e){}return false}return true});count()};
   c.on('close',gone);c.on('error',gone)}
  const keepAwake=()=>{try{navigator.wakeLock&&navigator.wakeLock.request('screen').then(x=>{wl=x}).catch(()=>{})}catch(e){}};
