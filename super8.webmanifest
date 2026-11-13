@@ -1,0 +1,33 @@
+{
+  "name": "Super8 — Classic Super 8 Camera",
+  "short_name": "Super8",
+  "description": "Experience the nostalgic feel of a classic Super 8 film camera. Shoot, frame, and capture cinematic moments with authentic vintage vibes.",
+  "id": "https://easylandx.github.io/super8/",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#000000",
+  "theme_color": "#111111",
+  "lang": "en",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
