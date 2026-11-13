@@ -127,21 +127,6 @@ body[data-mode=proj] #infoR.has{display:-webkit-box}
 #msg.show{opacity:1;transform:translate(-50%,0)}
 @media (prefers-reduced-motion:reduce){.view,#msg,.fab{transition:none}.recording .led{animation:none}}
 
-/* ---------- live viewer: host button (right column) + viewer screen ---------- */
-#bLive{position:relative}
-#bLive .lvN{display:none;position:absolute;top:-5px;right:-5px;min-width:18px;height:18px;padding:0 4px;border-radius:9px;background:#fff;color:#c4161c;border:1.5px solid #c4161c;font:800 11px/15px system-ui,sans-serif;text-align:center;font-variant-numeric:tabular-nums}
-#bLive.on{background:#c4161c;box-shadow:0 0 0 2px #fff,0 6px 14px #0008;animation:bl 1.3s ease-in-out infinite}
-#bLive.on .lvN{display:block}
-#bLive.on::before{content:"LIVE";position:absolute;left:50%;bottom:-7px;transform:translateX(-50%);background:#fff;color:#c4161c;border:1.5px solid #c4161c;border-radius:8px;padding:0 5px;font:800 8px/12px system-ui,sans-serif;letter-spacing:.08em}
-.ui-hidden #bLive.on{opacity:1;transform:none;pointer-events:auto}
-#liveV{display:none;position:fixed;inset:0;z-index:4;background:var(--kodak);align-items:center;justify-content:center}
-#liveVid,#liveCv{width:min(100vw,calc(100lvh*4/3));aspect-ratio:4/3;background:#000;object-fit:contain;box-shadow:0 0 0 3px #000,0 0 0 5px var(--ye)}
-#liveBadge{display:none;position:fixed;z-index:6;left:50%;top:calc(env(safe-area-inset-top,0px) + 84px);transform:translateX(-50%);background:#fff;color:#c4161c;border:2px solid #c4161c;border-radius:10px;padding:2px 10px;font:900 12px/16px system-ui,sans-serif;letter-spacing:.1em}
-#liveMsg{position:fixed;z-index:6;left:50%;top:50%;transform:translate(-50%,-50%);max-width:calc(100% - 40px);text-align:center;color:#fff;font:800 16px/1.3 "Avenir Next","Helvetica Neue",Arial,sans-serif;text-shadow:0 1px 6px #000;pointer-events:none}
-body.liveView #liveV,body.liveView #liveBadge{display:flex}
-body.liveView #liveBadge{display:block}
-body.liveView.liveEnded #liveBadge{background:#555;color:#fff;border-color:#555}
-body.liveView #stage,body.liveView .col,body.liveView #dots,body.liveView #infoL,body.liveView #infoR,body.liveView #sheet,body.liveView #catSheet,body.liveView #big{display:none!important}
 </style>
 </head>
 <body data-mode="back">
@@ -185,7 +170,6 @@ body.liveView #stage,body.liveView .col,body.liveView #dots,body.liveView #infoL
  <button class="ib fab" id="dlAll" aria-label="Save reel" title="Save reel"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v12M7 11l5 5 5-5M4 20h16"/></svg></button>
  <button class="ib fab" id="waAll" aria-label="Send on WhatsApp" title="WhatsApp" style="color:#5ee08a"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20l1.3-4.2A8 8 0 1 1 8.3 18.8z"/><path d="M9 9c0 3 3 6 6 6l1.5-1.5-2-1-1 .8c-1-.4-2-1.4-2.4-2.4l.8-1-1-2z"/></svg></button>
  <button class="ib fab" id="reload" aria-label="Load new film" title="Load new film"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.5-5.8M20 4v5h-5"/></svg></button>
-<button class="ib fab" id="bLive" aria-label="Live viewer" aria-pressed="false" title="Live viewer: share a link so others watch you, live"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12Z"/><circle cx="12" cy="12" r="2.8"/></svg><span class="lvN" id="liveN">0</span></button>
 </div>
 <div class="col bot cam-only"><button class="ib fab" id="rec" aria-label="Hold to record" title="Hold to record"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="currentColor"/></svg></button></div>
 <div class="col bot pj-only">
@@ -214,14 +198,12 @@ body.liveView #stage,body.liveView .col,body.liveView #dots,body.liveView #infoL
 <div id="sheet"><div id="sheetIn"><div id="clips"></div></div></div>
 <div id="catSheet"><div id="catIn"><h2>Archive.org movies · search or pick a category</h2><form class="srF" id="srF" role="search"><input id="srQ" type="search" placeholder="Search any movie or video…" enterkeyhint="search" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Search archive.org movies and videos"><button class="ib s" type="submit" aria-label="Search" title="Search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l5 5"/></svg></button></form><div id="srRes"></div><div id="catList"></div><p class="hint">Pick a category to project a random movie. Pick it again for the next random one.</p></div></div>
 <div id="big"><canvas id="bigc" width="400" height="300"></canvas><div class="hint">Tap to close</div></div>
-<div id="liveV"><video id="liveVid" autoplay muted playsinline></video></div><div id="liveBadge">LIVE</div><div id="liveMsg"></div>
+<div id="liveV"><video id="liveVid" autoplay muted playsinline></video></div><div id="liveBadge">LIVE</div>
 <div id="msg" role="status"></div>
 
 <script>
 (()=>{
 const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
-const LV=(()=>{const v=new URLSearchParams(location.search).get('live');return v&&/^[A-Za-z0-9]{6,20}$/.test(v)?v:null})();
-if(LV)document.body.classList.add('liveView');
 const MAXFILM=180,MINC=2,MAXC=8,W=400,H=300;           // 3 minutes of film, clips of 2–8 s, working size 400×300
 const DIM={back:[1448,1086,0],front:[1448,1086,0],proj:[1448,1086,0]}; // [photo width, visible height, top crop]
 const LOOKS={
@@ -307,7 +289,7 @@ async function cam(){const my=++camSeq;try{stream&&stream.getTracks().forEach(t=
  if(my!==camSeq){s.getTracks().forEach(t=>t.stop());return}
  stream=s;vid.srcObject=s;await vid.play()}catch(e){toast('Camera unavailable. Open this page over https in Safari and allow camera access.',5000)}}
 $('#flip').onclick=()=>setMode(mode==='back'?'front':'back');   // back view = phone's rear camera, front view = phone's front (selfie) camera
-if(!LV)cam();
+cam();
 
 const live=$('#live'),lctx=live.getContext('2d',{willReadFrequently:true}),lens=$('#lensc').getContext('2d'),
  big=$('#bigc').getContext('2d'),sc=$('#sc').getContext('2d');
@@ -360,10 +342,8 @@ async function reelBlob(){const d=clips.filter(c=>c.dev);if(!d.length){toast('De
  (A web link can only carry text, so the video itself is attached by hand from the saved file.) */
 function dl(b,n){const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=n;document.body.appendChild(a);a.click();setTimeout(()=>{a.remove();URL.revokeObjectURL(a.href)},4000)}
 const MOB=/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)||(navigator.maxTouchPoints>1&&/Mac/.test(navigator.platform));
-function WA(){const t=encodeURIComponent('Filmed on Super 8 🎞️ https://easylandx.github.io/super');
- if(MOB){                                   // phone: open the WhatsApp app straight away (no share sheet, no pickers)
-  location.href='whatsapp://send?text='+t;
-  setTimeout(()=>{if(!document.hidden)location.href='https://api.whatsapp.com/send?text='+t},1500)}   // app not installed: fall back to the web link
+function WA(){const base='https://easylandx.github.io/super8/';const shortTitle=arch?String(arch.title||'').replace(/\s*\(\d{4}\).*$/,'').replace(/^['"“”]+|['"“”]+$/g,'').trim():'';const msg=arch?`Super 8 🎞️\n\n${base}?film=${encodeURIComponent(arch.id)}\n\n${shortTitle}`:`Super 8 🎞️\n\n${base}`;const t=encodeURIComponent(msg);
+ if(MOB){location.href='whatsapp://send?text='+t;setTimeout(()=>{if(!document.hidden)location.href='https://api.whatsapp.com/send?text='+t},1500)}
  else window.open('https://web.whatsapp.com/send?text='+t,'_blank')}
 const share=WA;
 $('#dlAll').onclick=async()=>{const b=await reelBlob();b&&dl(b,'super8-reel.'+ext())};
@@ -430,7 +410,7 @@ async function movieFrom(doc){
  if(!fs.length)throw new Error('no mp4');
  return{id:doc.identifier,title:doc.title||doc.identifier,url:'https://archive.org/download/'+encodeURIComponent(doc.identifier)+'/'+fs[0].name.split('/').map(encodeURIComponent).join('/')}}
 function loadVideo(url){return new Promise(res=>{let done=false;const fin=v=>{if(!done){done=true;res(v)}};
- pv.onloadeddata=()=>fin(true);pv.onerror=()=>fin(false);setTimeout(()=>fin(false),25000);pv.muted=false;pv.src=url;pv.load()})}
+ pv.onloadeddata=()=>fin(true);pv.onerror=()=>fin(false);setTimeout(()=>fin(false),25000);pv.muted=true;pv.src=url;pv.load()})}
 let archHist=[],archPos=-1;
 const arcUrl=mv=>'https://archive.org/details/'+encodeURIComponent(mv.id);
 async function openArch(mv){stop2();if(!await loadVideo(mv.url))return false;arch=mv;src='archive';setInfo(mv.title,arcUrl(mv));startArch();return true}
@@ -480,8 +460,10 @@ async function archStep(d){
  archBusy=true;toast('Threading film…',60000);
  try{const mv=archHist[archPos+d];if(await openArch(mv)){archPos+=d;toast('Now showing: '+mv.title,4000)}else toast('Couldn’t load that movie.')}
  finally{archBusy=false}}
-function startArch(){ac();playing=true;paused=false;pauseIcon();lampUpdate();click(.4,900);stopHum=humFor();
- pv.onended=()=>stop2();pv.onerror=()=>{toast('The film broke. Pick the category again.');stop2()};pv.play().catch(()=>stop2())}
+function startArch(){ac();pv.muted=true;playing=true;paused=false;pauseIcon();lampUpdate();click(.4,900);stopHum=humFor();
+ pv.onended=()=>stop2();pv.onerror=()=>{toast('The film broke. Pick the category again.');stop2()};pv.play().catch(()=>{playing=true;paused=true;pauseIcon();lampUpdate();toast('Tap Play to start the film.',5000)})}
+// A tap on the projected image enables the film sound after autoplay has started muted.
+$('#screen').addEventListener('click',()=>{if(src==='archive'&&arch){pv.muted=false;pv.play().catch(()=>{});if(paused){paused=false;playing=true;pauseIcon();lampUpdate()}}});
 
 /* ---- transport: pause, previous / next (movie or clip), fast forward / rewind (hold) ---- */
 function togglePause(){if(!playing)return;
@@ -530,6 +512,20 @@ $('#catSheet').onclick=e=>{if(e.target.id==='catSheet')$('#catSheet').classList.
 const ORDER=['back','front','proj'],stage=$('#stage');
 function setMode(m){if(rec||m===mode)return;mode=m;stage.style.setProperty('--cur',ORDER.indexOf(m));$$('.view').forEach(v=>v.classList.toggle('on',v.id==='v-'+m));
  $$('.dot').forEach(b=>b.classList.toggle('on',b.dataset.m===m));document.body.dataset.mode=m;if(m==='back'||m==='front'){stop2();const f=m==='front'?'user':'environment';if(f!==facing||!stream){facing=f;cam()}}click(.2,1500)}
+/* A shared archive link opens the projector and starts that exact film automatically. */
+(async()=>{
+ const filmId=new URLSearchParams(location.search).get('film');
+ if(!filmId||!/^[A-Za-z0-9._-]{1,120}$/.test(filmId))return;
+ setMode('proj');archBusy=true;toast('Loading shared film…',60000);
+ try{
+  const meta=await jget('https://archive.org/metadata/'+encodeURIComponent(filmId));
+  const doc={identifier:filmId,title:(meta.metadata&&meta.metadata.title)||filmId};
+  const mv=await movieFrom(doc);
+  if(await openArch(mv)){archHist=[mv];archPos=0;toast('Now showing: '+mv.title,4500)}
+  else toast('Couldn’t play this film. Try opening it from the archive.',4500);
+ }catch(e){toast('This shared film is not available to play.',4500)}
+ finally{archBusy=false}
+})();
 $$('.dot').forEach(b=>b.onclick=()=>setMode(b.dataset.m));
 function hideUI(){document.body.classList.add('ui-hidden')}function showUI(){document.body.classList.remove('ui-hidden')}
 $$('.fab').forEach(b=>b.addEventListener('click',()=>{if(b.id!=='rec'&&!b.classList.contains('tp'))hideUI()}));   // pressing any button hides them all
@@ -556,140 +552,6 @@ function loop(t){requestAnimationFrame(loop);if(t-last<50)return;last=t;
    sc.fillStyle='#000';sc.fillRect(0,0,W,H);
    if(src==='archive'&&pv.videoWidth){const k=Math.min(W/pv.videoWidth,H/pv.videoHeight),w=pv.videoWidth*k,h=pv.videoHeight*k;sc.drawImage(pv,(W-w)/2+wx,(H-h)/2+wy,w,h)}else sc.drawImage(pv,-6+wx,-5+wy,W+12,H+10);sc.fillStyle=`rgba(0,0,0,${Math.random()*.12})`;sc.fillRect(0,0,W,H)}
   else{sc.fillStyle=`rgb(${245+Math.random()*10|0},${232+Math.random()*10|0},${200})`;sc.fillRect(0,0,W,H)}}}
-/* ================= LIVE VIEWER (host streams what is on screen, viewers watch read-only) =================
- Same idea as the Selectric app: tap the eye button, a link is copied and WhatsApp opens with the invite ready to send.
- Here the host's camera view (or projector screen) is streamed to everyone who opens the link, peer to peer (PeerJS). */
-(function(){
- const b=$('#bLive'),nEl=$('#liveN'),AL='abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789',MAXV=8,BASE='https://easylandx.github.io/super8/';
- const loadPeer=()=>Promise.all([loadLib(),loadIce()]);
- const loadLib=()=>window.Peer?Promise.resolve():new Promise((res,rej)=>{const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js';s.onload=res;s.onerror=()=>rej(new Error('peerjs'));document.head.appendChild(s)});
- const rnd=()=>{let c='';const a=new Uint32Array(8);crypto.getRandomValues(a);for(const v of a)c+=AL[v%AL.length];return c};
- const url=c=>BASE+'?live='+c;
- /* STUN + a TURN relay: without a relay, phones on mobile data / different Wi-Fi often cannot reach each other and the viewer sees nothing */
- const ICE={iceServers:[{urls:'stun:stun.l.google.com:19302'},{urls:'stun:stun.cloudflare.com:3478'},{urls:'stun:global.stun.twilio.com:3478'},
-  {urls:['turn:openrelay.metered.ca:80','turn:openrelay.metered.ca:443','turn:openrelay.metered.ca:443?transport=tcp','turns:openrelay.metered.ca:443?transport=tcp'],username:'openrelayproject',credential:'openrelayproject'},
-  {urls:['turn:freestun.net:3478','turns:freestun.net:5349'],username:'free',credential:'free'}],iceCandidatePoolSize:4};
- /* Free public relays come and go. For a relay that always works: make a free account at metered.ca, then put your app name and API key here (both empty = public relays only) */
- const TURN_APP='',TURN_KEY='';let iceP=null;
- const loadIce=()=>iceP||(iceP=(async()=>{if(!TURN_APP||!TURN_KEY)return;
-  try{const ctl=new AbortController(),tm=setTimeout(()=>ctl.abort(),4000);
-   const r=await fetch('https://'+TURN_APP+'.metered.live/api/v1/turn/credentials?apiKey='+TURN_KEY,{signal:ctl.signal});clearTimeout(tm);
-   const j=await r.json();if(Array.isArray(j)&&j.length)ICE.iceServers=j.concat(ICE.iceServers)}catch(e){}})());
- function copy(t){try{const x=document.createElement('textarea');x.value=t;x.setAttribute('readonly','');x.style.cssText='position:fixed;left:-9999px;top:0;opacity:0';document.body.appendChild(x);x.select();document.execCommand('copy');x.remove()}catch(e){}}
-
- /* ---------- viewer side: ?live=CODE ----------
-    The host sends the picture as JPEG frames over the PeerJS data connection (the same kind of link the Selectric live view uses),
-    instead of a WebRTC video call, which was connecting but delivering black. */
- if(LV){
-  const vv=$('#liveVid'),badge=$('#liveBadge'),lm=$('#liveMsg'),box=$('#liveV');
-  vv.style.display='none';
-  const cv=document.createElement('canvas');cv.id='liveCv';cv.width=W;cv.height=H;box.appendChild(cv);const cx=cv.getContext('2d');
-  let got=false,over=false,pr=null,rt=0,wd=0,lastF=0,t0=Date.now();const LIMIT=150000;   // keeps trying for 2½ minutes (the host may still be switching back from WhatsApp)
-  const say=t=>{lm.textContent=t;lm.style.display='block'};
-  const end=()=>{if(over)return;over=true;clearTimeout(rt);clearInterval(wd);try{pr&&pr.destroy()}catch(e){}document.body.classList.add('liveEnded');badge.textContent='ENDED';say('This session has ended')};
-  const later=ms=>{clearTimeout(rt);rt=setTimeout(connect,ms)};
-  function paint(m){
-   let bl;try{bl=m instanceof Blob?m:new Blob([m],{type:'image/jpeg'})}catch(e){return}
-   const done=()=>{if(!got){got=true;t0=Date.now();clearTimeout(rt)}lastF=Date.now();lm.style.display='none';badge.textContent='LIVE';document.body.classList.remove('liveEnded')};
-   if(window.createImageBitmap)createImageBitmap(bl).then(bm=>{cx.drawImage(bm,0,0,W,H);try{bm.close()}catch(e){}done()}).catch(()=>{});
-   else{const u=URL.createObjectURL(bl),im=new Image();im.onload=()=>{cx.drawImage(im,0,0,W,H);URL.revokeObjectURL(u);done()};im.src=u}}
-  /* no picture for a few seconds while connected: start over */
-  const watch=()=>{clearInterval(wd);wd=setInterval(()=>{if(over||!got)return;if(Date.now()-lastF>8000){got=false;say('Lost the picture, reconnecting…');later(300)}},2000)};
-  function connect(){
-   if(over||got)return;
-   if(Date.now()-t0>LIMIT){end();return}
-   try{pr&&pr.destroy()}catch(e){}
-   const me=pr=new Peer({config:ICE});
-   me.on('error',()=>{if(pr!==me||over||got)return;say('Waiting for the host… (the host must keep Super 8 open)');later(2500)});
-   me.on('open',()=>{
-    if(pr!==me)return;
-    const d=me.connect('s8L'+LV,{reliable:true});
-    d.on('open',()=>{if(!got)say('Connected, waiting for the picture…')});
-    d.on('data',m=>{if(m&&m.k==='end'){end();return}if(m&&m.k)return;paint(m)});
-    const lost=()=>{if(pr!==me||over)return;got=false;say('Reconnecting to the live session…');later(2000)};
-    d.on('close',lost);d.on('error',()=>{if(!got)lost()});
-    later(25000)})}   // no picture after 25 s (relays can be slow): start over
-  watch();
-  document.addEventListener('visibilitychange',()=>{if(!document.hidden&&!got&&!over)later(200)});
-  say('Connecting to the live session…');
-  loadPeer().then(connect).catch(()=>say('Couldn’t load the live viewer. Check your connection and reload.'));
-  return}
-
- /* ---------- host side ---------- */
- let peer=null,conns=[],calls=[],code=null,hosting=false,ft=0,st=0,fstream=false,wl=null,idTry=0;
- const feed=document.createElement('canvas');feed.width=W;feed.height=H;const fx=feed.getContext('2d');
- /* what viewers see = what the host sees: the graded camera picture, or the projector screen */
- function feedOn(){if(fstream)return;fstream=true;
-  feed.style.cssText='position:fixed;left:0;bottom:0;width:2px;height:2px;opacity:.02;pointer-events:none;z-index:-1';document.body.appendChild(feed);
-  const note=(a,b)=>{fx.fillStyle='#111';fx.fillRect(0,0,W,H);fx.textAlign='center';fx.fillStyle='#fff';fx.font='bold 22px system-ui,sans-serif';fx.fillText(a,W/2,H/2-8);fx.fillStyle='#bbb';fx.font='15px system-ui,sans-serif';fx.fillText(b,W/2,H/2+20)};
-  ft=setInterval(()=>{try{
-   if(mode==='back'||mode==='front'){
-    if(stream&&vid.readyState>=2&&!document.hidden)fx.drawImage(live,0,0,W,H);
-    else note(document.hidden?'The host stepped away':'Host camera not ready',document.hidden?'Waiting for the host to come back…':'Waiting for the camera…')}
-   else if(document.body.classList.contains('lamp')&&playing)fx.drawImage($('#sc'),0,0,W,H);
-   else note('Projector is off','The host has not started a movie yet')
-  }catch(e){}},50);
-  /* ~8 pictures a second, encoded once and sent to every viewer; a viewer whose link is backed up simply skips pictures */
-  let enc=false;
-  st=setInterval(()=>{if(enc||!conns.some(c=>c.open))return;enc=true;
-   feed.toBlob(bl=>{if(!bl){enc=false;return}
-    bl.arrayBuffer().then(buf=>{conns.forEach(c=>{try{if(c.open&&(!c.dataChannel||c.dataChannel.bufferedAmount<300000))c.send(buf)}catch(e){}});enc=false}).catch(()=>{enc=false})},'image/jpeg',.6)},120)}
- function feedOff(){clearInterval(ft);clearInterval(st);ft=0;st=0;try{feed.remove()}catch(e){}fstream=false}
- const count=()=>{nEl.textContent=conns.filter(c=>c.open).length};
- function stopLive(msg){
-  hosting=false;
-  conns.forEach(c=>{try{if(c.open)c.send({k:'end'})}catch(e){}});
-  const pr=peer,cs=conns,cl=calls;peer=null;conns=[];calls=[];code=null;
-  setTimeout(()=>{cl.forEach(c=>{try{c.close()}catch(e){}});cs.forEach(c=>{try{c.close()}catch(e){}});try{pr&&pr.destroy()}catch(e){}},250);
-  feedOff();try{wl&&wl.release()}catch(e){}wl=null;b.classList.remove('on');b.setAttribute('aria-pressed','false');nEl.textContent='0';
-  if(msg)toast(msg,2200)}
- function onConn(c){
-  if(!hosting)return;
-  c.on('open',()=>{
-   if(conns.filter(x=>x.open).length>=MAXV){try{c.send({k:'end'})}catch(e){}setTimeout(()=>c.close(),300);return}
-   conns.push(c);count();
-   });
-  const gone=()=>{conns=conns.filter(x=>x!==c);calls=calls.filter(k=>{if(k.peer===c.peer){try{k.close()}catch(e){}return false}return true});count()};
-  c.on('close',gone);c.on('error',gone)}
- const keepAwake=()=>{try{navigator.wakeLock&&navigator.wakeLock.request('screen').then(x=>{wl=x}).catch(()=>{})}catch(e){}};
- /* coming back from WhatsApp: wake the connection to the live server up again so new viewers can join */
- document.addEventListener('visibilitychange',()=>{
-  if(document.hidden||!hosting||!code)return;
-  keepAwake();
-  if(!peer||peer.destroyed)begin(code);
-  else if(peer.disconnected){try{peer.reconnect()}catch(e){begin(code)}}});
- setInterval(()=>{   // heartbeat: while the page is open, keep the host reachable for people who tap the link later
-  if(!hosting||!code||document.hidden)return;
-  if(!peer||peer.destroyed){begin(code);return}
-  if(peer.disconnected){try{peer.reconnect()}catch(e){}}},4000);
- function begin(id){
-  if(!window.Peer)return;
-  const pr=new Peer('s8L'+id,{config:ICE});peer=pr;
-  pr.on('open',()=>{idTry=0});
-  pr.on('connection',onConn);
-  pr.on('disconnected',()=>{try{pr.reconnect()}catch(e){}});
-  pr.on('error',e=>{
-   if(!hosting||peer!==pr)return;
-   if(e&&e.type==='unavailable-id'){try{pr.destroy()}catch(x){}   // id still held by the server after a drop: retry the SAME link first
-    if(idTry++<5){setTimeout(()=>{if(hosting)begin(id)},2500);return}
-    idTry=0;code=rnd();copy('Watch Live Super8\n'+url(code));begin(code);return}
-   if(e&&(e.type==='network'||e.type==='server-error'||e.type==='socket-error'||e.type==='socket-closed'))return;
-   stopLive('Couldn’t start live sharing')})}
- b.onclick=()=>{
-  if(hosting){stopLive('Live sharing stopped');return}
-  /* the link is made and copied right inside the tap, so the browser always allows the clipboard */
-  code=rnd();hosting=true;feedOn();keepAwake();
-  const msg='Watch Live Super8\n'+url(code),t=encodeURIComponent(msg);
-  copy(msg);b.classList.add('on');b.setAttribute('aria-pressed','true');nEl.textContent='0';
-  toast('Live link copied!',2600);
-  loadPeer().then(()=>{if(hosting)begin(code)}).catch(()=>stopLive('Couldn’t start live sharing'));
-  /* straight into WhatsApp with the invite ready to send */
-  /* never navigate THIS page to a web URL: it would unload Super 8 and end the live session. The link is already copied, so if WhatsApp does not open, just paste it. */
-  if(MOB){location.href='whatsapp://send?text='+t;
-   setTimeout(()=>{if(!document.hidden)toast('Live link copied. Open WhatsApp and paste it, then come back here.',4500)},1800)}
-  else window.open('https://web.whatsapp.com/send?text='+t,'_blank')};
-})();
-
 requestAnimationFrame(loop);
 })();
 </script>
